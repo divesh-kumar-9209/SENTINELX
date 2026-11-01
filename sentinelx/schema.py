@@ -1,82 +1,132 @@
-
+import json
 from datetime import datetime, timezone
-from typing import Any
+from pathlib import Path
 
 
-REQUIRED_FIELDS = {
+REQUIRED_FIELDS = [
     "event_id",
     "timestamp",
     "source",
     "event_type",
     "host",
-    "severity"
+    "severity",
+]
+
+VALID_SEVERITIES = {
+    "informational",
+    "low",
+    "medium",
+    "high",
+    "critical",
 }
 
 
-def normalize_event(raw: dict[str, Any]) -> dict[str, Any]:
-
-    if not isinstance(raw, dict):
-        raise ValueError("Event must be a JSON object")
-
-    event = {
-        "event_id": str(raw.get("event_id") or ""),
-        "timestamp": str(raw.get("timestamp") or ""),
-        "source": str(raw.get("source") or "unknown"),
-        "event_type": str(raw.get("event_type") or "unknown"),
-        "host": str(raw.get("host") or "unknown"),
-        "username": raw.get("username"),
-        "source_ip": raw.get("source_ip"),
-        "destination_ip": raw.get("destination_ip"),
-        "source_port": raw.get("source_port"),
-        "destination_port": raw.get("destination_port"),
-        "protocol": raw.get("protocol"),
-        "severity": str(raw.get("severity") or "low").lower(),
-        "description": str(raw.get("description") or ""),
-        "raw_event": raw.get("raw_event", raw)
-    }
-
-    missing = [
-        field for field in REQUIRED_FIELDS
-        if not event.get(field)
-    ]
-
-    if missing:
-        raise ValueError(
-            "Missing required fields: " + ", ".join(sorted(missing))
-        )
+def validate_timestamp(value):
+    """Validate an ISO 8601 timestamp and convert it to UTC."""
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError("Timestamp must be a non-empty string.")
 
     try:
-        parsed = datetime.fromisoformat(
-            event["timestamp"].replace("Z", "+00:00")
-        )
-
-        if parsed.tzinfo is None:
-            parsed = parsed.replace(tzinfo=timezone.utc)
-
-        event["timestamp"] = (
-            parsed.astimezone(timezone.utc)
-            .isoformat()
-            .replace("+00:00", "Z")
-        )
-
+        parsed = datetime.fromisoformat(value.strip().replace("Z", "+00:00"))
     except ValueError:
+        raise ValueError(f"Invalid timestamp: {value}")
+
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+
+    return parsed.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+
+
+def normalize_event(event):
+    """Validate and normalize a single security event."""
+    if not isinstance(event, dict):
+        raise ValueError("Each event must be a JSON object.")
+
+    missing_fields = [
+        field for field in REQUIRED_FIELDS
+        if field not in event or event[field] is None or
+        (isinstance(event[field], str) and not event[field].strip())
+    ]
+
+    if missing_fields:
         raise ValueError(
-            "Timestamp must be a valid ISO-8601 datetime"
+            "Missing or empty required fields: " + ", ".join(missing_fields)
         )
 
-    if event["severity"] not in {
-        "low", "medium", "high", "critical"
-    }:
-        raise ValueError("Invalid severity level")
+    normalized = event.copy()
 
-    return event
+    for field in ("event_id", "source", "event_type", "host"):
+        if not isinstance(normalized[field], str):
+            raise ValueError(f"{field} must be a string.")
 
+        normalized[field] = normalized[field].strip()
 
-def normalize_events(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    normalized["timestamp"] = validate_timestamp(normalized["timestamp"])
 
-    normalized = []
+    if not isinstance(normalized["severity"], str):
+        raise ValueError("Severity must be a string.")
 
-    for record in records:
-        normalized.append(normalize_event(record))
+    severity = normalized["severity"].strip().lower()
+
+    if severity not in VALID_SEVERITIES:
+        raise ValueError(
+            f"Invalid severity '{severity}'. "
+            f"Allowed values: {', '.join(sorted(VALID_SEVERITIES))}"
+        )
+
+    normalized["severity"] = severity
 
     return normalized
+
+
+def normalize_events(events):
+    """Validate and normalize a list of security events."""
+    if not isinstance(events, list):
+        raise ValueError("Events data must be a JSON list.")
+
+    if not events:
+        raise ValueError("The event list is empty.")
+
+    normalized_events = []
+    errors = []
+
+    for index, event in enumerate(events):
+        try:
+            normalized_events.append(normalize_event(event))
+        except ValueError as error:
+            errors.append(f"Event {index + 1}: {error}")
+
+    if errors:
+        raise ValueError("\n".join(errors))
+
+    return normalized_events
+
+
+def load_events_from_json(source):
+    """
+    Load events from a JSON file path or an uploaded file object.
+    Accepts either a list of events or an object containing an 'events' list.
+    """
+    try:
+        if hasattr(source, "read"):
+            content = source.read()
+            if isinstance(content, bytes):
+                content = content.decode("utf-8-sig")
+        else:
+            content = Path(source).read_text(encoding="utf-8-sig")
+
+        data = json.loads(content)
+
+    except json.JSONDecodeError as error:
+        raise ValueError(f"Invalid JSON file: {error.msg}") from error
+    except UnicodeDecodeError as error:
+        raise ValueError("File must use UTF-8 encoding.") from error
+    except OSError as error:
+        raise ValueError(f"Unable to read file: {error}") from error
+
+    if isinstance(data, dict):
+        if "events" not in data:
+            raise ValueError("JSON object must contain an 'events' field.")
+        data = data["events"]
+
+    return normalize_events(data)

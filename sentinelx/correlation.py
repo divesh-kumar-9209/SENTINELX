@@ -1,6 +1,5 @@
-
 from collections import defaultdict
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 
 
@@ -8,7 +7,7 @@ SEVERITY_RANK = {
     "low": 1,
     "medium": 2,
     "high": 3,
-    "critical": 4
+    "critical": 4,
 }
 
 
@@ -17,7 +16,10 @@ def parse_timestamp(value):
         value.replace("Z", "+00:00")
     )
 
-    return parsed
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+
+    return parsed.astimezone(timezone.utc)
 
 
 def correlate_detections(events, detections):
@@ -26,7 +28,7 @@ def correlate_detections(events, detections):
         for event in events
     }
 
-    grouped_detections = defaultdict(list)
+    host_detections = defaultdict(list)
 
     for detection in detections:
         related_events = [
@@ -38,84 +40,126 @@ def correlate_detections(events, detections):
         if not related_events:
             continue
 
-        hosts = {
-            event["host"]
-            for event in related_events
-        }
+        hosts = {event["host"] for event in related_events}
 
         for host in hosts:
-            grouped_detections[host].append(detection)
+            host_detections[host].append(detection)
 
     incidents = []
 
-    for host, host_detections in grouped_detections.items():
+    for host, records in host_detections.items():
 
-        all_event_ids = set()
-        all_detection_ids = []
-        all_events = []
-        techniques = set()
-
-        for detection in host_detections:
-            all_detection_ids.append(
-                detection["detection_id"]
-            )
-
-            all_event_ids.update(
-                detection["event_ids"]
-            )
-
-            techniques.add(detection["mitre"])
-
-        for event_id in all_event_ids:
-            if event_id in event_lookup:
-                all_events.append(
-                    event_lookup[event_id]
-                )
-
-        if not all_events:
-            continue
-
-        all_events.sort(
-            key=lambda event: parse_timestamp(
-                event["timestamp"]
+        records.sort(
+            key=lambda detection: min(
+                parse_timestamp(event_lookup[event_id]["timestamp"])
+                for event_id in detection["event_ids"]
+                if event_id in event_lookup
             )
         )
 
-        highest_severity = max(
-            (
-                detection["severity"]
-                for detection in host_detections
-            ),
-            key=lambda severity: SEVERITY_RANK.get(
-                severity, 0
-            )
-        )
+        groups = []
 
-        incident = {
-            "incident_id": str(uuid4()),
-            "host": host,
-            "severity": highest_severity,
-            "detection_ids": all_detection_ids,
-            "event_ids": sorted(all_event_ids),
-            "event_count": len(all_event_ids),
-            "detection_count": len(all_detection_ids),
-            "start_time": all_events[0]["timestamp"],
-            "end_time": all_events[-1]["timestamp"],
-            "mitre_techniques": sorted(techniques),
-            "summary": (
-                f"{len(all_detection_ids)} detection(s) involving "
-                f"{len(all_event_ids)} event(s) were associated "
-                f"with host {host}."
-            )
-        }
+        for detection in records:
+            detection_events = [
+                event_lookup[event_id]
+                for event_id in detection["event_ids"]
+                if event_id in event_lookup
+            ]
 
-        incidents.append(incident)
+            detection_start = min(
+                parse_timestamp(event["timestamp"])
+                for event in detection_events
+            )
+
+            matched_group = None
+
+            for group in reversed(groups):
+                if detection_start - group["last_time"] <= timedelta(minutes=30):
+                    matched_group = group
+                    break
+
+            if matched_group is None:
+                matched_group = {
+                    "detections": [],
+                    "last_time": detection_start,
+                }
+                groups.append(matched_group)
+
+            matched_group["detections"].append(detection)
+
+            matched_group["last_time"] = max(
+                matched_group["last_time"],
+                max(
+                    parse_timestamp(event["timestamp"])
+                    for event in detection_events
+                ),
+            )
+
+        for group in groups:
+            group_detections = group["detections"]
+
+            event_ids = {
+                event_id
+                for detection in group_detections
+                for event_id in detection["event_ids"]
+                if event_id in event_lookup
+            }
+
+            incident_events = [
+                event_lookup[event_id]
+                for event_id in event_ids
+            ]
+
+            incident_events.sort(
+                key=lambda event: parse_timestamp(event["timestamp"])
+            )
+
+            techniques = {
+                detection["mitre"]
+                for detection in group_detections
+                if detection.get("mitre")
+            }
+
+            severity = max(
+                (
+                    detection["severity"]
+                    for detection in group_detections
+                ),
+                key=lambda value: SEVERITY_RANK.get(value, 0),
+            )
+
+            incidents.append({
+                "incident_id": str(uuid4()),
+                "host": host,
+                "severity": severity,
+                "detection_ids": [
+                    detection["detection_id"]
+                    for detection in group_detections
+                ],
+                "event_ids": sorted(
+                    event_ids,
+                    key=lambda event_id: parse_timestamp(
+                        event_lookup[event_id]["timestamp"]
+                    ),
+                ),
+                "event_count": len(event_ids),
+                "detection_count": len(group_detections),
+                "start_time": incident_events[0]["timestamp"],
+                "end_time": incident_events[-1]["timestamp"],
+                "mitre_techniques": sorted(techniques),
+                "summary": (
+                    f"{len(group_detections)} detection(s) involving "
+                    f"{len(event_ids)} event(s) were associated "
+                    f"with host {host}."
+                ),
+                "status": "Open",
+            })
 
     incidents.sort(
         key=lambda incident: SEVERITY_RANK.get(
             incident["severity"], 0
         ),
-        reverse=True
+        reverse=True,
     )
 
     return incidents

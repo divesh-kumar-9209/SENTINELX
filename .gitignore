@@ -2,6 +2,7 @@
 __pycache__/
 *.py[cod]
 *$py.class
+.streamlit/secrets.toml
 
 # C extensions
 *.so
@@ -179,3 +180,10 @@ cython_debug/
 #  refer to https://docs.cursor.com/context/ignore-files
 .cursorignore
 .cursorindexingignore
+
+# Streamlit configuration
+.streamlit/
+
+# Local test data
+test_security_logs.json
+tests/test_upload.json
