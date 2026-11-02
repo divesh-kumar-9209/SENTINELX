@@ -25,6 +25,213 @@ st.set_page_config(
 
 
 # --------------------------------------------------
+# SENTINELX THEME-AWARE DESIGN SYSTEM
+# --------------------------------------------------
+
+st.markdown("""
+<style>
+/* Use Streamlit's active theme variables so both light and dark modes work. */
+.stApp {
+    background: var(--background-color);
+    color: var(--text-color);
+}
+
+.block-container {
+    max-width: 1550px;
+    padding-top: 2rem;
+    padding-bottom: 3rem;
+}
+
+/* Typography */
+h1 {
+    font-weight: 800 !important;
+    letter-spacing: -1px;
+}
+
+h2, h3 {
+    color: var(--primary-color) !important;
+    font-weight: 750 !important;
+}
+
+[data-testid="stCaptionContainer"] {
+    opacity: 0.78;
+}
+
+/* Sidebar */
+[data-testid="stSidebar"] {
+    background: var(--secondary-background-color);
+    border-right: 1px solid color-mix(in srgb, var(--text-color) 14%, transparent);
+}
+
+/* Top brand area */
+.sentinel-brand {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 8px 0 18px 0;
+}
+
+.sentinel-brand-icon {
+    font-size: 42px;
+    line-height: 1;
+}
+
+.sentinel-brand-name {
+    font-size: clamp(30px, 4vw, 42px);
+    line-height: 1.1;
+    font-weight: 850;
+    letter-spacing: 1px;
+    color: var(--text-color);
+}
+
+.sentinel-subtitle {
+    color: var(--primary-color);
+    font-size: clamp(18px, 2vw, 25px);
+    font-weight: 750;
+    line-height: 1.35;
+    margin-top: 4px;
+}
+
+.sentinel-tagline {
+    color: var(--text-color);
+    opacity: 0.68;
+    font-size: 13px;
+    margin-top: 10px;
+}
+
+/* Security overview cards */
+.metric-card {
+    background: var(--secondary-background-color);
+    color: var(--text-color);
+    border: 1px solid color-mix(in srgb, var(--text-color) 15%, transparent);
+    border-left: 4px solid var(--accent);
+    border-radius: 14px;
+    padding: 19px 20px;
+    min-height: 145px;
+    box-shadow: 0 5px 18px rgba(0, 0, 0, 0.07);
+    transition: transform 160ms ease, box-shadow 160ms ease;
+}
+
+.metric-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 9px 24px rgba(0, 0, 0, 0.12);
+}
+
+.metric-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    color: var(--text-color);
+    opacity: 0.76;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.8px;
+}
+
+.metric-icon {
+    font-size: 21px;
+    opacity: 1;
+}
+
+.metric-value {
+    color: var(--text-color);
+    font-size: 36px;
+    font-weight: 850;
+    line-height: 1.2;
+    margin-top: 15px;
+}
+
+.metric-description {
+    color: var(--text-color);
+    opacity: 0.68;
+    font-size: 12px;
+    margin-top: 5px;
+}
+
+.metric-blue { --accent: #3b82f6; }
+.metric-cyan { --accent: #06b6d4; }
+.metric-purple { --accent: #8b5cf6; }
+.metric-red { --accent: #ef4444; }
+
+/* Expanders and containers */
+[data-testid="stExpander"] {
+    background: var(--secondary-background-color);
+    border: 1px solid color-mix(in srgb, var(--text-color) 16%, transparent);
+    border-radius: 11px;
+}
+
+[data-testid="stVerticalBlockBorderWrapper"] {
+    border-radius: 12px;
+}
+
+/* Buttons */
+.stButton > button,
+.stDownloadButton > button,
+[data-testid="stFormSubmitButton"] > button {
+    border-radius: 9px;
+    font-weight: 650;
+    transition: transform 150ms ease, box-shadow 150ms ease;
+}
+
+.stButton > button:hover,
+.stDownloadButton > button:hover,
+[data-testid="stFormSubmitButton"] > button:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 5px 14px rgba(0, 0, 0, 0.12);
+}
+
+/* Inputs retain active theme backgrounds and foregrounds. */
+.stTextArea textarea,
+.stTextInput input,
+[data-baseweb="select"] > div {
+    border-radius: 8px;
+}
+
+/* Tables */
+[data-testid="stDataFrame"] {
+    border: 1px solid color-mix(in srgb, var(--text-color) 15%, transparent);
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+/* Dividers */
+hr {
+    border-color: color-mix(in srgb, var(--text-color) 18%, transparent) !important;
+}
+
+/* Status callouts */
+[data-testid="stAlert"] {
+    border-radius: 10px;
+}
+
+/* Footer */
+.sentinel-footer {
+    text-align: center;
+    color: var(--text-color);
+    opacity: 0.62;
+    font-size: 12px;
+    padding: 12px 0;
+}
+
+@media (max-width: 900px) {
+    .block-container {
+        padding-left: 1rem;
+        padding-right: 1rem;
+    }
+    .metric-card {
+        min-height: 125px;
+        padding: 15px;
+    }
+    .metric-value {
+        font-size: 30px;
+    }
+}
+</style>
+""", unsafe_allow_html=True)
+
+
+# --------------------------------------------------
 # INCIDENT FINGERPRINT
 # --------------------------------------------------
 
@@ -55,15 +262,18 @@ def incident_fingerprint(incident):
 # PAGE HEADER
 # --------------------------------------------------
 
-st.title("🛡️ SENTINELX")
-
-st.subheader(
-    "Behavioral Threat Detection and Incident Investigation Platform"
-)
-
-st.caption(
-    "Security Monitoring | Event Correlation | Incident Analysis"
-)
+st.markdown("""
+<div class="sentinel-brand">
+    <div class="sentinel-brand-icon">🛡️</div>
+    <div class="sentinel-brand-name">SENTINELX</div>
+</div>
+<div class="sentinel-subtitle">
+    Behavioral Threat Detection and Incident Investigation Platform
+</div>
+<div class="sentinel-tagline">
+    SECURITY MONITORING&nbsp;&nbsp;|&nbsp;&nbsp;EVENT CORRELATION&nbsp;&nbsp;|&nbsp;&nbsp;INCIDENT ANALYSIS
+</div>
+""", unsafe_allow_html=True)
 
 st.divider()
 
@@ -158,33 +368,33 @@ stats = results["statistics"]
 
 st.header("Security Overview")
 
-col1, col2, col3, col4 = st.columns(4)
-
-col1.metric(
-    "Total Events",
-    stats["total_events"]
-)
-
-col2.metric(
-    "Detections",
-    stats["total_detections"]
-)
-
-col3.metric(
-    "Incidents",
-    stats["total_incidents"]
-)
-
 critical_count = sum(
     1
     for incident in incidents
     if incident["severity"] == "critical"
 )
 
-col4.metric(
-    "Critical Incidents",
-    critical_count
-)
+metric_columns = st.columns(4)
+
+metric_cards = [
+    ("TOTAL EVENTS", stats["total_events"], "📊", "All processed security events", "metric-blue"),
+    ("DETECTIONS", stats["total_detections"], "🔍", "Suspicious activities identified", "metric-cyan"),
+    ("INCIDENTS", stats["total_incidents"], "🚨", "Correlated security incidents", "metric-purple"),
+    ("CRITICAL INCIDENTS", critical_count, "⚠️", "Require priority attention", "metric-red"),
+]
+
+for column, (label, value, symbol, description, style_class) in zip(metric_columns, metric_cards):
+    with column:
+        st.markdown(f"""
+        <div class="metric-card {style_class}">
+            <div class="metric-top">
+                <span>{label}</span>
+                <span class="metric-icon">{symbol}</span>
+            </div>
+            <div class="metric-value">{value}</div>
+            <div class="metric-description">{description}</div>
+        </div>
+        """, unsafe_allow_html=True)
 
 
 st.divider()
@@ -586,20 +796,8 @@ st.divider()
 # FOOTER
 # --------------------------------------------------
 
-st.caption(
-    "SENTINELX | Academic Cybersecurity Project | "
-    "Automated analysis of security event data"
-)
-
-import json
-import hashlib
-from pathlib import Path
-
-import pandas as pd
-import streamlit as st
-
-from sentinelx.pipeline import run_pipeline
-from sentinelx.storage import (
-    get_investigation,
-    save_investigation
-)
+st.markdown("""
+<div class="sentinel-footer">
+    SENTINELX&nbsp; | &nbsp;Academic Cybersecurity Project&nbsp; | &nbsp;Automated analysis of security event data
+</div>
+""", unsafe_allow_html=True)
